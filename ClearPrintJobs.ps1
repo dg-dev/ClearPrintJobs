@@ -1,4 +1,4 @@
-# ClearPrintJobs.ps1 v1.1 2023-06-12 by Dennis G.
+# ClearPrintJobs.ps1 v1.2 2023-06-21 by Dennis G.
  
 # Yeets all print jobs when jobs over certain age are found to fix stuck printer queues.
 # To be run by Task Scheduler every ~5 minutes until a better solution is found.
@@ -6,20 +6,42 @@
 $jobsDir = "C:\Windows\System32\spool\PRINTERS"
 $jobExts = ".spl", ".shd"
 $maxJobAgeMins = 17
+$maxLogSizeBytes = 1024 * 1024 * 1
 
 $scriptName = (Get-Item $PSCommandPath).BaseName
 $scriptDir = (Get-Item $PSCommandPath).Directory
-$logPath = "{0}\{1}.log" -f $scriptDir, $scriptName
+$logDir = "{0}\Logs" -f $scriptDir
+$logPath = "{0}\{1}.log" -f $logDir, $scriptName
 
 function Write-Log {
     param(
         [Parameter()]
         $Value = ''
     )
-    Add-Content -Path $logPath -Value ("{0} {1}" -f (Get-Date -Format "yyyy-MM-dd HH:mm:ss"), $Value) -Force
+    $finalOutput = ("{0} {1}" -f (Get-Date -Format "yyyy-MM-dd HH:mm:ss"), $Value)
+    Write-Host $finalOutput
+    Add-Content -Path $logPath -Value $finalOutput -Force
 }
 
 Write-Log "Starting"
+
+if (-Not (Test-Path -Path $logDir -PathType Container)) {
+    New-Item -ItemType Directory -Path $logDir
+}
+
+# Rotate log
+if ((Test-Path -Path $logPath -PathType Leaf) -and ((Get-Item -Path $logPath).length -ge $maxLogSizeBytes)) {
+    $archivePath = "{0}\{1}-{2}.zip" -f $logDir, $scriptName, (Get-Date -Format "yyyyMMddHHmmss")
+    Write-Log "  Rotating log"
+    Write-Log ("    Archiving to {0}" -f $archivePath)
+    try {
+        Compress-Archive -Path $logPath -CompressionLevel Optimal -DestinationPath $archivePath -ErrorAction Stop
+        Remove-Item -Path $logPath -Force -ErrorAction Stop
+        Write-Log "Continuing"
+    } catch {
+        Write-Log ("     ERROR: {0}" -f $Error[0])
+    }
+}
 
 $SpoolerService = Get-Service -ServiceName Spooler
 Write-Log ('  Spooler service status: {0}' -f $SpoolerService.Status)
