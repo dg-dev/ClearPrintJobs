@@ -1,11 +1,11 @@
-# ClearPrintJobs.ps1 v1.0 2023-05-31 by Dennis G.
+# ClearPrintJobs.ps1 v1.1 2023-06-12 by Dennis G.
  
 # Yeets all print jobs when jobs over certain age are found to fix stuck printer queues.
 # To be run by Task Scheduler every ~5 minutes until a better solution is found.
 
 $jobsDir = "C:\Windows\System32\spool\PRINTERS"
 $jobExts = ".spl", ".shd"
-$maxJobAgeMins = 20
+$maxJobAgeMins = 17
 
 $scriptName = (Get-Item $PSCommandPath).BaseName
 $scriptDir = (Get-Item $PSCommandPath).Directory
@@ -32,9 +32,12 @@ $oldJobFiles = $allJobFiles |
 Write-Log -Value ("    Found {1} out of {0} job files exceeding {2} minutes" -f $allJobFiles.Length, $oldJobFiles.Length, $maxJobAgeMins)
 $allJobFiles | ForEach-Object -Process {
         $ageMins = (New-TimeSpan -Start $PSItem.CreationTime -End (Get-Date)).TotalMinutes
-        $ageString = ''
-        if ($ageMins -gt $maxJobAgeMins) { $ageString = ' [{0} mins]' -f [int]$ageMins } 
-        Write-Log -Value ("      {0}{1}" -f $PSItem.Name, $ageString)
+        #$ageString = ''
+        #if ($ageMins -gt $maxJobAgeMins) { $ageString = ' [{0} mins]' -f [int]$ageMins }
+        $ageNote = ''
+        if ($ageMins -gt $maxJobAgeMins) { $ageNote = ' !!!' }
+        $ageString = ' [{0} mins]' -f [int]$ageMins
+        Write-Log -Value ("      {0}{1}{2}" -f $PSItem.Name, $ageString, $ageNote)
     }
 if (!$oldJobFiles) { exit 0 }
 
